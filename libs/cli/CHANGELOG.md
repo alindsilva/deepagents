@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.40](https://github.com/langchain-ai/deepagents/compare/deepagents-cli==0.0.39...deepagents-cli==0.0.40) (2026-04-18)
+
+
+### Bug Fixes
+
+* **cli:** normalize serialized message dicts in `/offload` ([#2808](https://github.com/langchain-ai/deepagents/issues/2808)) ([0d11bd4](https://github.com/langchain-ai/deepagents/commit/0d11bd46fd682c7aa3f008918771e9759dca7352))
+
 ## [0.0.39](https://github.com/langchain-ai/deepagents/compare/deepagents-cli==0.0.38...deepagents-cli==0.0.39) (2026-04-17)
 
 
