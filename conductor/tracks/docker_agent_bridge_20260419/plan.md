@@ -10,11 +10,11 @@
 - [x] Task: Reverse engineer docker-agent YAML parser rules into a requirements document
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Requirements Engineering' (Protocol in workflow.md)
 
-## Phase 2: Project Setup & Scaffolding
+## Phase 2: Project Setup & Scaffolding [checkpoint: e36c997f]
 - [x] Task: Create `pyproject.toml` and directory structure bf4faf82
 - [x] Task: Write tests for YAML parser ace13e7a
 - [x] Task: Implement basic YAML parser module dbce8482
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Project Setup & Scaffolding' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Project Setup & Scaffolding' (Protocol in workflow.md) e36c997f
 
 ## Phase 3: Model & Provider Initialization
 - [ ] Task: Write tests for model resolution
