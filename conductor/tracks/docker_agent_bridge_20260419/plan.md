@@ -21,12 +21,12 @@
 - [x] Task: Implement parser for `providers` and `models` YAML blocks 02801673
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Model & Provider Initialization' (Protocol in workflow.md) 943ae37c
 
-## Phase 4: Tool and MCP Mapping
-- [ ] Task: Write tests for toolset resolution
-- [ ] Task: Implement `resolve_tools` for standard deepagents tools
-- [ ] Task: Write tests for MCP ref parsing (stdio/docker and streamable/remote)
-- [ ] Task: Implement custom MCP loader for `docker-agent` formats
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Tool and MCP Mapping' (Protocol in workflow.md)
+## Phase 4: Tool and MCP Mapping [checkpoint: 29e3748a]
+- [x] Task: Write tests for toolset resolution 18f5b042
+- [x] Task: Implement resolve_tools for standard deepagents tools c5f83c8b
+- [x] Task: Write tests for MCP ref parsing (stdio/docker and streamable/remote) 9a00ae51
+- [x] Task: Implement custom MCP loader for docker-agent formats 05623756
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Tool and MCP Mapping' (Protocol in workflow.md) 29e3748a
 
 ## Phase 5: Agent Orchestration
 - [ ] Task: Write tests for sub-agent and root agent generation
