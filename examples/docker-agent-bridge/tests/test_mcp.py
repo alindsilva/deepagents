@@ -63,3 +63,8 @@ def test_resolve_mcp_remote_streamable(monkeypatch):
     assert conn["transport"] == "streamable_http"
     assert conn["url"] == "http://localhost:8001/mcp"
     assert conn["headers"]["Authorization"] == "Bearer test-key"
+
+def test_resolve_mcp_skip_non_mcp():
+    toolsets = [{"type": "filesystem"}]
+    connections = resolve_mcp_connections(toolsets)
+    assert connections == {}

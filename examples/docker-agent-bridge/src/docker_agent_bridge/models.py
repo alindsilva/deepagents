@@ -1,18 +1,7 @@
 import os
-import re
 from typing import Any
 from langchain.chat_models import init_chat_model
-
-def interpolate_env_vars(text: str) -> str:
-    """Replace ${VAR_NAME} placeholders with environment variables."""
-    def replace_match(match):
-        var_name = match.group(1)
-        value = os.environ.get(var_name)
-        if value is None:
-            raise ValueError(f"Environment variable {var_name} not found")
-        return value
-
-    return re.sub(r"\$\{([^}]+)\}", replace_match, text)
+from docker_agent_bridge.utils import interpolate_env_vars
 
 def resolve_models(config: dict[str, Any]) -> dict[str, Any]:
     """Parse providers and models blocks into LangChain chat models.
