@@ -54,12 +54,16 @@ def build_agent_graph(config: dict[str, Any]) -> Any:
         model = models.get(model_name)
 
         # 4. Create the Deep Agent
+        # 'skills' in create_deep_agent expects a list of paths. 
+        # If skills: true is in YAML, we'll provide default skill paths.
+        skills_paths = ["./skills/"] if agent_data.get("skills") is True else None
+
         agent = create_deep_agent(
             model=model,
             system_prompt=agent_data.get("instruction"),
             tools=tools,
             subagents=subagents_specs,
-            skills=agent_data.get("skills") is True
+            skills=skills_paths
         )
 
         instantiated_agents[name] = agent

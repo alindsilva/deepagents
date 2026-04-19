@@ -1,0 +1,9 @@
+#!/usr/bin/env docker agent run
+
+agents:
+  root:
+    model: openai/gpt-4o-mini
+    description: A helpful AI assistant
+    instruction: |
+      You are a knowledgeable assistant that helps users with various tasks.
+      Be helpful, accurate, and concise in your responses.
