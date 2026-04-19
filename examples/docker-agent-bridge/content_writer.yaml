@@ -1,0 +1,49 @@
+# Translated Content Builder Agent
+
+models:
+  writer_model:
+    provider: openai
+    model: gpt-4o-mini
+    temperature: 0.1
+  
+  research_model:
+    provider: openai
+    model: gpt-4o-mini
+    temperature: 0.2
+
+agents:
+  root:
+    model: writer_model
+    description: "Master content writer that coordinates research and generates images."
+    instruction: |
+      You are a content writer. You create high-quality blog posts and social media content.
+      You MUST use the researcher agent first to gather facts before writing.
+      You have tools to generate cover images for your posts.
+    sub_agents:
+      - researcher
+    toolsets:
+      - type: filesystem
+      - type: todo
+      - type: script
+        shell:
+          generate_cover:
+            cmd: "echo 'Image generated for: $prompt (slug: $slug)'"
+            description: "Generate a cover image for a blog post."
+            args:
+              prompt: {type: string}
+              slug: {type: string}
+
+  researcher:
+    model: research_model
+    description: "Web researcher specialist."
+    instruction: |
+      You are a research assistant. Find facts and sources on the web.
+    toolsets:
+      - type: filesystem
+      - type: script
+        shell:
+          web_search:
+            cmd: "echo 'Search results for: $query'"
+            description: "Search the web for information."
+            args:
+              query: {type: string}
