@@ -1,0 +1,21 @@
+[project]
+name = "docker-agent-bridge"
+version = "0.1.0"
+description = "Lightweight mapping layer from docker-agent YAML to deepagents"
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml>=6.0.0",
+    "deepagents",
+    "langchain-mcp-adapters",
+    "langchain-anthropic",
+    "langchain-openai",
+]
+
+[tool.uv.sources]
+deepagents = { path = "../../libs/deepagents", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
