@@ -39,7 +39,12 @@
 - [x] Task: Write README.md documentation c10a23fe
 - [x] Task: Conductor - User Manual Verification 'Phase 6: CLI Entry Point and Documentation' (Protocol in workflow.md) 24c035b5
 
-## Phase 7: Example Parity and Validation
-- [ ] Task: Bootstrap a simple YAML file from `docker-agent` examples and verify execution
-- [ ] Task: Translate an existing `deepagents` example into YAML and verify execution parity
-- [ ] Task: Conductor - User Manual Verification 'Phase 7: Example Parity and Validation' (Protocol in workflow.md)
+## Phase 7: Example Parity and Validation [checkpoint: 18d3fcb8]
+- [x] Task: Bootstrap a simple YAML file from `docker-agent` examples and verify execution 7bbbd464
+- [x] Task: Translate an existing `deepagents` example into YAML and verify execution parity 9fc7ce52
+- [x] Task: Conductor - User Manual Verification 'Phase 7: Example Parity and Validation' (Protocol in workflow.md) 18d3fcb8
+
+## Phase 8: Advanced Configuration Validation
+- [ ] Task: Write tests for complex provider and model options from portfolio_management team
+- [ ] Task: Write tests for remote streamable MCP connection with authentication headers
+- [ ] Task: Conductor - User Manual Verification 'Phase 8: Advanced Configuration Validation' (Protocol in workflow.md)
