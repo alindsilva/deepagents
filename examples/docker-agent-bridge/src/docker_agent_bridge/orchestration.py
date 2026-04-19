@@ -1,10 +1,11 @@
 from typing import Any
 from deepagents.graph import create_deep_agent
-from deepagents.middleware.subagents import CompiledSubAgent
 from deepagents.middleware.summarization import SummarizationMiddleware
 from deepagents.backends import StateBackend
 from docker_agent_bridge.models import resolve_models
 from docker_agent_bridge.tools import resolve_tools
+from docker_agent_bridge.mcp import resolve_mcp_connections
+from langchain_mcp_adapters.client import MultiServerMCPClient
 
 async def build_agent_graph(config: dict[str, Any]) -> Any:
     """Build the agent LangGraph from docker-agent YAML configuration.
@@ -17,6 +18,14 @@ async def build_agent_graph(config: dict[str, Any]) -> Any:
     """
     models = resolve_models(config)
     agents_config = config.get("agents", {})
+
+    # 1. Aggregate all MCP connections for a shared client
+    all_mcp_configs = {}
+    for agent_data in agents_config.values():
+        all_mcp_configs.update(resolve_mcp_connections(agent_data.get("toolsets", [])))
+    
+    mcp_client = MultiServerMCPClient(all_mcp_configs) if all_mcp_configs else None
+    mcp_tools = await mcp_client.get_tools() if mcp_client else []
 
     # Memoize instantiated agents to handle hierarchies
     instantiated_agents = {}
@@ -36,15 +45,20 @@ async def build_agent_graph(config: dict[str, Any]) -> Any:
             sub_graph = await get_agent(sub_name)
             sub_config = agents_config[sub_name]
             
-            # Wrap as CompiledSubAgent for deepagents middleware
+            # Wrap for deepagents middleware
             subagents_specs.append({
                 "name": sub_name,
                 "description": sub_config.get("description", ""),
                 "runnable": sub_graph
             })
 
-        # 2. Resolve tools (non-subagent tools)
+        # 2. Resolve local tools (non-MCP)
         tools = await resolve_tools(agent_data.get("toolsets", []))
+        
+        # Add shared MCP tools
+        # For simplicity in this bridge, we give all shared MCP tools to all agents.
+        # production logic would filter based on 'tools:' keys in YAML toolsets.
+        tools.extend(mcp_tools)
         
         # 3. Resolve model
         model_name = agent_data.get("model")
@@ -55,7 +69,6 @@ async def build_agent_graph(config: dict[str, Any]) -> Any:
             raise ValueError(f"Model '{model_name}' not found for agent '{name}'")
 
         # 4. Resolve middleware
-        # Note: create_deep_agent adds standard middleware by default.
         num_history = agent_data.get("num_history_items")
         
         # 5. Create the Deep Agent

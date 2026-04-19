@@ -8,6 +8,7 @@ The bridge allows you to define complex multi-agent teams using a declarative DS
 
 ### Supported Features
 
+- **Professional TUI**: Supports the full `deepagents` terminal user interface via the `--tui` flag.
 - **Multi-Agent Hierarchies**: Supports `root` and `sub_agents` delegation.
 - **Provider & Model Mapping**: Handles custom base URLs, headers, and environment variable interpolation (e.g., Cloudflare AI Gateway).
 - **Tool Mapping**:
@@ -29,13 +30,13 @@ The bridge allows you to define complex multi-agent teams using a declarative DS
 
 ## Usage
 
-Run the bridge against a YAML configuration file:
+Run the bridge against a YAML configuration file in the professional TUI:
 
 ```bash
-uv run python -m docker_agent_bridge.main team.yaml --query "Research LangGraph and summarize its benefits."
+uv run python -m docker_agent_bridge.main team.yaml --tui
 ```
 
-Or run interactively:
+Or run in a simple conversation loop:
 
 ```bash
 uv run python -m docker_agent_bridge.main team.yaml

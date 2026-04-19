@@ -154,9 +154,24 @@ def resolve_models(config: dict[str, Any]) -> dict[str, Any]:
         # We'll stick to the actual backend keys for now as sourced from .env.
 
         try:
-            masked_key = f"{api_key[:6]}...{api_key[-4:]}" if api_key and len(api_key) > 10 else "NONE"
+            # Prepare arguments for init_chat_model
+            # Start with explicit configuration from YAML
+            model_args = {
+                "model": model_name,
+                "model_provider": effective_provider,
+                "temperature": resolved_config.get("temperature"),
+                "max_tokens": resolved_config.get("max_tokens"),
+            }
+
+            # Add optional args only if they are not None
+            if api_key:
+                model_args["api_key"] = api_key
+            if base_url:
+                model_args["base_url"] = base_url
             
-            pass_headers = interpolated_headers if effective_provider not in ["google_genai"] else None
+            # Google GenAI strictly forbids 'default_headers' even if None
+            if effective_provider != "google_genai" and interpolated_headers:
+                model_args["default_headers"] = interpolated_headers
 
             from deepagents.profiles import _get_harness_profile
             profile_key = "cloudflare" if is_gateway else effective_provider
@@ -166,19 +181,19 @@ def resolve_models(config: dict[str, Any]) -> dict[str, Any]:
             if profile.init_kwargs_factory:
                 init_kwargs.update(profile.init_kwargs_factory())
             
+            # Filter init_kwargs for gateways
             if is_gateway:
                 init_kwargs = {k: v for k, v in init_kwargs.items() if v is not False}
 
+            # Merge provider_opts, excluding those handled elsewhere
+            provider_opts = resolved_config.get("provider_opts", {}).copy()
+            if effective_provider != "anthropic":
+                provider_opts.pop("service_tier", None)
+
             model = init_chat_model(
-                model=model_name,
-                model_provider=effective_provider,
-                api_key=api_key,
-                temperature=resolved_config.get("temperature"),
-                max_tokens=resolved_config.get("max_tokens"),
-                base_url=base_url,
-                default_headers=pass_headers,
+                **model_args,
                 **init_kwargs,
-                **resolved_config.get("provider_opts", {})
+                **provider_opts
             )
             resolved_models[name] = model
         except Exception as e:

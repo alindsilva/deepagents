@@ -55,8 +55,13 @@
 - [x] Task: Verify the full `portfolio_management_with_beads.yaml` with Cloudflare models eb0f8d5a
 - [x] Task: Conductor - User Manual Verification 'Phase 9: Dynamic Profile Registration' (Protocol in workflow.md) eb0f8d5a
 
-## Phase 10: TUI Integration
-- [ ] Task: Add `deepagents-cli` dependency to `pyproject.toml`
-- [ ] Task: Implement `--tui` flag in `main.py` to launch `TerminalAssistant` with the compiled YAML graph
-- [ ] Task: Verify TUI mode with `portfolio_management_with_beads.yaml`
-- [ ] Task: Conductor - User Manual Verification 'Phase 10: TUI Integration' (Protocol in workflow.md)
+## Phase 10: TUI Integration [checkpoint: 27eceb86]
+- [x] Task: Add `deepagents-cli` dependency to `pyproject.toml`
+- [x] Task: Implement `--tui` flag in `main.py` to launch `TerminalAssistant` with the compiled YAML graph
+- [x] Task: Verify TUI mode with `portfolio_management_with_beads.yaml`
+- [x] Task: Conductor - User Manual Verification 'Phase 10: TUI Integration' (Protocol in workflow.md)
+
+## Phase 11: Review Refinement [checkpoint: final]
+- [x] Task: Remove shadow tools from tools.py to let SDK handles built-ins
+- [x] Task: Refine MCP lifecycle for long-running TUI sessions
+- [x] Task: Conductor - User Manual Verification 'Phase 11: Review Refinement' (Protocol in workflow.md)
