@@ -48,3 +48,9 @@
 - [x] Task: Write tests for complex provider and model options from portfolio_management team 7b386e67
 - [x] Task: Write tests for remote streamable MCP connection with authentication headers c202767f
 - [x] Task: Conductor - User Manual Verification 'Phase 8: Advanced Configuration Validation' (Protocol in workflow.md) f38dd307
+
+## Phase 9: Dynamic Profile Registration for Custom Providers
+- [ ] Task: Implement `register_custom_profiles` to wrap gateway models in `_HarnessProfile`
+- [ ] Task: Update `resolve_models` to use dynamic profiles and resolve Cloudflare 404/400 errors
+- [ ] Task: Verify the full `portfolio_management_with_beads.yaml` with Cloudflare models
+- [ ] Task: Conductor - User Manual Verification 'Phase 9: Dynamic Profile Registration' (Protocol in workflow.md)
