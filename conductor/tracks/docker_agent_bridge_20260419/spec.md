@@ -9,6 +9,7 @@ Create a new example project inside the `deepagents` repository (`examples/docke
 - **MCP Integration:** Dynamically handle MCP server configurations, mapping `docker:` refs to `StdioConnection` wrapped in `langchain-mcp-adapters`'s `MultiServerMCPClient`. Also support custom remote MCP connections via URL/headers for `streamable` setups.
 - **Agent Orchestration:** Build LangGraph sub-agents and a root agent utilizing `create_deep_agent`.
 - **Execution:** Provide a CLI entry point to run the bridge against a given YAML file.
+- **Validation:** Ensure the bridge can execute a simple `docker-agent` example and a YAML-translated `deepagents` example with parity to the native Python implementation.
 
 ## Out of Scope
 - Building a full CLI replacement for `docker-agent`. This is just an example bridge.
