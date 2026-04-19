@@ -71,4 +71,24 @@ def test_resolve_script_tool():
     
     custom_tool = next(t for t in tools if t.name == "my_custom_tool")
     assert custom_tool.description == "A custom tool"
-    # Testing execution of custom tool would require real sub-process or mock
+    
+    # Test execution
+    result = custom_tool.invoke({"arg1": "world"})
+    assert "hello world" in result
+
+def test_resolve_script_tool_error():
+    yaml_content = dedent("""
+        agents:
+          root:
+            toolsets:
+              - type: script
+                shell:
+                  error_tool:
+                    cmd: "ls non_existent_file_12345"
+    """)
+    config = parse_yaml_config(yaml_content)
+    tools = resolve_tools(config["agents"]["root"]["toolsets"])
+    error_tool = next(t for t in tools if t.name == "error_tool")
+    
+    result = error_tool.invoke({})
+    assert "Error:" in result
