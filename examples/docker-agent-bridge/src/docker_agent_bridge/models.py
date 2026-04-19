@@ -155,7 +155,6 @@ def resolve_models(config: dict[str, Any]) -> dict[str, Any]:
 
         try:
             masked_key = f"{api_key[:6]}...{api_key[-4:]}" if api_key and len(api_key) > 10 else "NONE"
-            print(f"[Bridge] Initializing model '{name}': provider={effective_provider}, model={model_name}, api_key={masked_key}, base_url={base_url}")
             
             pass_headers = interpolated_headers if effective_provider not in ["google_genai"] else None
 

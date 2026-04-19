@@ -6,7 +6,7 @@ from deepagents.backends import StateBackend
 from docker_agent_bridge.models import resolve_models
 from docker_agent_bridge.tools import resolve_tools
 
-def build_agent_graph(config: dict[str, Any]) -> Any:
+async def build_agent_graph(config: dict[str, Any]) -> Any:
     """Build the agent LangGraph from docker-agent YAML configuration.
 
     Args:
@@ -21,7 +21,7 @@ def build_agent_graph(config: dict[str, Any]) -> Any:
     # Memoize instantiated agents to handle hierarchies
     instantiated_agents = {}
 
-    def get_agent(name: str):
+    async def get_agent(name: str):
         if name in instantiated_agents:
             return instantiated_agents[name]
 
@@ -33,37 +33,32 @@ def build_agent_graph(config: dict[str, Any]) -> Any:
         sub_agent_names = agent_data.get("sub_agents", [])
         subagents_specs = []
         for sub_name in sub_agent_names:
-            sub_graph = get_agent(sub_name)
+            sub_graph = await get_agent(sub_name)
             sub_config = agents_config[sub_name]
             
             # Wrap as CompiledSubAgent for deepagents middleware
-            subagents_specs.append(CompiledSubAgent(
-                name=sub_name,
-                description=sub_config.get("description", ""),
-                runnable=sub_graph
-            ))
+            subagents_specs.append({
+                "name": sub_name,
+                "description": sub_config.get("description", ""),
+                "runnable": sub_graph
+            })
 
         # 2. Resolve tools (non-subagent tools)
-        tools = resolve_tools(agent_data.get("toolsets", []))
+        tools = await resolve_tools(agent_data.get("toolsets", []))
         
         # 3. Resolve model
         model_name = agent_data.get("model")
         model = models.get(model_name)
+        if isinstance(model, Exception):
+            raise RuntimeError(f"Failed to initialize model '{model_name}' for agent '{name}': {model}")
+        if not model:
+            raise ValueError(f"Model '{model_name}' not found for agent '{name}'")
 
         # 4. Resolve middleware
-        middleware = []
+        # Note: create_deep_agent adds standard middleware by default.
         num_history = agent_data.get("num_history_items")
-        if num_history:
-            # Inject summarization middleware to control history size
-            middleware.append(SummarizationMiddleware(
-                model=model,
-                backend=StateBackend(),
-                keep=("messages", num_history)
-            ))
-
+        
         # 5. Create the Deep Agent
-        # 'skills' in create_deep_agent expects a list of paths. 
-        # If skills: true is in YAML, we'll provide default skill paths.
         skills_paths = ["./skills/"] if agent_data.get("skills") is True else None
 
         agent = create_deep_agent(
@@ -72,11 +67,11 @@ def build_agent_graph(config: dict[str, Any]) -> Any:
             tools=tools,
             subagents=subagents_specs,
             skills=skills_paths,
-            middleware=middleware
+            middleware=None 
         )
 
         instantiated_agents[name] = agent
         return agent
 
     # The entry point is always the 'root' agent
-    return get_agent("root")
+    return await get_agent("root")

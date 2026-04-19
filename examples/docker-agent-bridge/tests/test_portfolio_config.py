@@ -37,10 +37,12 @@ def test_portfolio_provider_and_model_resolution(monkeypatch):
     model = models["gemini_flash_via_cloudflare"]
     
     # Assert base_url from provider was used and interpolated
+    # Note: For Cloudflare OpenAI-compatible gateways, we now standardized on /compat
     assert model.openai_api_base == "https://gateway.ai.cloudflare.com/v1/acc123/gw123/compat"
     # Assert headers were merged and interpolated
     assert model.default_headers["cf-aig-authorization"] == "Bearer tok123"
-    assert model.default_headers["x-goog-api-key"] == "goog123"
+    # x-goog-api-key is popped and used as the actual api_key for the provider
+    assert model.openai_api_key.get_secret_value() == "goog123"
 
 def test_portfolio_mcp_resolution(monkeypatch):
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "supa123")
@@ -65,11 +67,14 @@ def test_portfolio_mcp_resolution(monkeypatch):
     assert conn["transport"] == "streamable_http"
     assert conn["headers"]["Authorization"] == "Bearer supa123"
 
+@pytest.mark.asyncio
 @patch("docker_agent_bridge.orchestration.create_deep_agent")
 @patch("docker_agent_bridge.orchestration.resolve_models")
-def test_portfolio_agent_orchestration(mock_resolve_models, mock_create_deep_agent):
+@patch("docker_agent_bridge.orchestration.resolve_tools")
+async def test_portfolio_agent_orchestration(mock_resolve_tools, mock_resolve_models, mock_create_deep_agent):
     mock_model = MagicMock()
     mock_resolve_models.return_value = {"gemini_flash_via_cloudflare": mock_model}
+    mock_resolve_tools.return_value = []
     
     yaml_content = dedent("""
         agents:
@@ -82,12 +87,11 @@ def test_portfolio_agent_orchestration(mock_resolve_models, mock_create_deep_age
             instruction: "You are the master portfolio manager"
     """)
     config = parse_yaml_config(yaml_content)
-    build_agent_graph(config)
+    await build_agent_graph(config)
     
     assert mock_create_deep_agent.call_count == 1
     args, kwargs = mock_create_deep_agent.call_args
     
     assert kwargs["model"] == mock_model
     assert kwargs["skills"] == ["./skills/"]
-    # Verify we need to handle max_iterations and num_history_items in orchestration.py
-    # (Checking currently if they are passed or if I need to add them)
+

@@ -5,13 +5,19 @@ from textwrap import dedent
 from docker_agent_bridge.parser import parse_yaml_config
 from docker_agent_bridge.orchestration import build_agent_graph
 
+@pytest.mark.asyncio
 @patch("docker_agent_bridge.orchestration.create_deep_agent")
 @patch("docker_agent_bridge.orchestration.resolve_models")
-def test_build_simple_agent(mock_resolve_models, mock_create_deep_agent):
+@patch("docker_agent_bridge.orchestration.resolve_tools")
+async def test_build_simple_agent(mock_resolve_tools, mock_resolve_models, mock_create_deep_agent):
     # Mock models
     mock_model = MagicMock()
     mock_resolve_models.return_value = {"gpt-4o": mock_model}
     
+    # Mock tools
+    mock_resolve_tools.return_value = [MagicMock(name="read_file")]
+    mock_resolve_tools.return_value[0].name = "read_file"
+
     yaml_content = dedent("""
         models:
           gpt-4o:
@@ -30,7 +36,7 @@ def test_build_simple_agent(mock_resolve_models, mock_create_deep_agent):
     mock_agent = MagicMock()
     mock_create_deep_agent.return_value = mock_agent
     
-    agent = build_agent_graph(config)
+    agent = await build_agent_graph(config)
     
     assert agent == mock_agent
     
@@ -38,16 +44,19 @@ def test_build_simple_agent(mock_resolve_models, mock_create_deep_agent):
     args, kwargs = mock_create_deep_agent.call_args
     assert kwargs["model"] == mock_model
     assert "You are a helpful assistant" in kwargs["system_prompt"]
-    # Check that filesystem tools were resolved (our proxy tools from tools.py)
+    # Check that filesystem tools were resolved
     tool_names = [t.name for t in kwargs["tools"]]
     assert "read_file" in tool_names
 
+@pytest.mark.asyncio
 @patch("docker_agent_bridge.orchestration.create_deep_agent")
 @patch("docker_agent_bridge.orchestration.resolve_models")
-def test_build_agent_hierarchy(mock_resolve_models, mock_create_deep_agent):
+@patch("docker_agent_bridge.orchestration.resolve_tools")
+async def test_build_agent_hierarchy(mock_resolve_tools, mock_resolve_models, mock_create_deep_agent):
     # Mock models
     mock_model = MagicMock()
     mock_resolve_models.return_value = {"default": mock_model}
+    mock_resolve_tools.return_value = []
     
     yaml_content = dedent("""
         models:
@@ -70,8 +79,6 @@ def test_build_agent_hierarchy(mock_resolve_models, mock_create_deep_agent):
     
     # Mock sub-agent and root agent creation
     mock_researcher_agent = MagicMock()
-    mock_researcher_agent.as_tool.return_value = MagicMock(name="researcher_tool")
-    mock_researcher_agent.as_tool.return_value.name = "researcher"
     
     mock_root_agent = MagicMock()
     
@@ -83,11 +90,11 @@ def test_build_agent_hierarchy(mock_resolve_models, mock_create_deep_agent):
         
     mock_create_deep_agent.side_effect = side_effect
     
-    agent = build_agent_graph(config)
+    agent = await build_agent_graph(config)
     
     assert agent == mock_root_agent
     
-    # Verify that researcher was created first and passed as a tool to root
+    # Verify that researcher was created first and passed as a subagent to root
     # Total calls: 1 for researcher, 1 for root
     assert mock_create_deep_agent.call_count == 2
     
@@ -96,8 +103,9 @@ def test_build_agent_hierarchy(mock_resolve_models, mock_create_deep_agent):
     subagent_names = [s["name"] for s in kwargs["subagents"]]
     assert "researcher" in subagent_names
 
+@pytest.mark.asyncio
 @patch("docker_agent_bridge.orchestration.resolve_models")
-def test_build_agent_missing_reference(mock_resolve_models):
+async def test_build_agent_missing_reference(mock_resolve_models):
     yaml_content = dedent("""
         agents:
           root:
@@ -106,11 +114,14 @@ def test_build_agent_missing_reference(mock_resolve_models):
     """)
     config = parse_yaml_config(yaml_content)
     with pytest.raises(ValueError, match="Agent 'missing_agent' not found in configuration"):
-        build_agent_graph(config)
+        await build_agent_graph(config)
 
+@pytest.mark.asyncio
 @patch("docker_agent_bridge.orchestration.create_deep_agent")
 @patch("docker_agent_bridge.orchestration.resolve_models")
-def test_build_shared_subagent(mock_resolve_models, mock_create_deep_agent):
+@patch("docker_agent_bridge.orchestration.resolve_tools")
+async def test_build_shared_subagent(mock_resolve_tools, mock_resolve_models, mock_create_deep_agent):
+    mock_resolve_tools.return_value = []
     yaml_content = dedent("""
         agents:
           root:
@@ -123,7 +134,7 @@ def test_build_shared_subagent(mock_resolve_models, mock_create_deep_agent):
             instruction: "I am shared"
     """)
     config = parse_yaml_config(yaml_content)
-    build_agent_graph(config)
+    await build_agent_graph(config)
     
     # 'shared' should only be instantiated once
     # Calls: 1 shared, 1 sub1, 1 sub2, 1 root = 4 total

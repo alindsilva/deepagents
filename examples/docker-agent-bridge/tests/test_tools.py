@@ -5,7 +5,8 @@ from unittest.mock import MagicMock
 from docker_agent_bridge.parser import parse_yaml_config
 from docker_agent_bridge.tools import resolve_tools
 
-def test_resolve_filesystem_tools():
+@pytest.mark.asyncio
+async def test_resolve_filesystem_tools():
     yaml_content = dedent("""
         agents:
           root:
@@ -14,7 +15,7 @@ def test_resolve_filesystem_tools():
     """)
     config = parse_yaml_config(yaml_content)
     # Get tools for the root agent
-    tools = resolve_tools(config["agents"]["root"]["toolsets"])
+    tools = await resolve_tools(config["agents"]["root"]["toolsets"])
     
     # Verify standard filesystem tools are present
     tool_names = [t.name for t in tools]
@@ -22,7 +23,8 @@ def test_resolve_filesystem_tools():
     assert "write_file" in tool_names
     assert "grep" in tool_names
 
-def test_resolve_shell_tool():
+@pytest.mark.asyncio
+async def test_resolve_shell_tool():
     yaml_content = dedent("""
         agents:
           root:
@@ -30,12 +32,13 @@ def test_resolve_shell_tool():
               - type: shell
     """)
     config = parse_yaml_config(yaml_content)
-    tools = resolve_tools(config["agents"]["root"]["toolsets"])
+    tools = await resolve_tools(config["agents"]["root"]["toolsets"])
     
     tool_names = [t.name for t in tools]
     assert "execute" in tool_names
 
-def test_resolve_todo_tool():
+@pytest.mark.asyncio
+async def test_resolve_todo_tool():
     yaml_content = dedent("""
         agents:
           root:
@@ -43,12 +46,13 @@ def test_resolve_todo_tool():
               - type: todo
     """)
     config = parse_yaml_config(yaml_content)
-    tools = resolve_tools(config["agents"]["root"]["toolsets"])
+    tools = await resolve_tools(config["agents"]["root"]["toolsets"])
     
     tool_names = [t.name for t in tools]
     assert "write_todos" in tool_names
 
-def test_resolve_script_tool():
+@pytest.mark.asyncio
+async def test_resolve_script_tool():
     yaml_content = dedent("""
         agents:
           root:
@@ -64,7 +68,7 @@ def test_resolve_script_tool():
                         description: "The argument"
     """)
     config = parse_yaml_config(yaml_content)
-    tools = resolve_tools(config["agents"]["root"]["toolsets"])
+    tools = await resolve_tools(config["agents"]["root"]["toolsets"])
     
     tool_names = [t.name for t in tools]
     assert "my_custom_tool" in tool_names
@@ -76,7 +80,8 @@ def test_resolve_script_tool():
     result = custom_tool.invoke({"arg1": "world"})
     assert "hello world" in result
 
-def test_resolve_script_tool_error():
+@pytest.mark.asyncio
+async def test_resolve_script_tool_error():
     yaml_content = dedent("""
         agents:
           root:
@@ -87,7 +92,7 @@ def test_resolve_script_tool_error():
                     cmd: "ls non_existent_file_12345"
     """)
     config = parse_yaml_config(yaml_content)
-    tools = resolve_tools(config["agents"]["root"]["toolsets"])
+    tools = await resolve_tools(config["agents"]["root"]["toolsets"])
     error_tool = next(t for t in tools if t.name == "error_tool")
     
     result = error_tool.invoke({})

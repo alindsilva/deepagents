@@ -1,0 +1,171 @@
+# Portfolio Management Team - Simplified for Bridge Testing
+# Removed Cloudflare, DMR, and Local Models
+
+models:
+  gpt-5-mini:
+    provider: openai
+    model: gpt-5-mini-2025-08-07
+    max_tokens: 2000
+
+  gpt-4o-mini:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 2000
+
+  claude-sonnet-4-5:
+    provider: anthropic
+    model: claude-sonnet-4-5-20250929
+    temperature: 0.2
+    max_tokens: 4000
+
+  claude-haiku-4-5:
+    provider: anthropic
+    model: claude-haiku-4-5-20251001
+    temperature: 0.1
+    max_tokens: 8000
+
+  gemini-3-flash:
+    provider: google
+    model: gemini-3-flash-preview
+    temperature: 0.2
+    max_tokens: 4000
+
+  gemini-3-pro:
+    provider: google
+    model: gemini-3-1-pro-preview
+    temperature: 0.2
+    max_tokens: 4000
+
+agents:
+  root:
+    model: gemini-3-flash
+    description: "Portfolio management team coordinator"
+    skills: true
+    add_date: true
+    max_iterations: 15
+    num_history_items: 25
+    instruction: |
+      You are the master portfolio manager coordinating a team of specialist agents.
+      1. Safety first: Always validate trades, check risk limits
+      2. Clear communication: Keep user informed of decisions and issues
+      3. Fail gracefully: Report problems early, offer alternatives
+    sub_agents:
+      - code_executor
+      - risk_manager
+      - market_researcher
+      - trader
+      - stock_analyst
+      - options_analyst
+    toolsets:
+      - type: mcp
+        remote:
+          url: "http://localhost:8001/mcp"
+          transport_type: "streamable"
+          headers:
+            Authorization: "Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}"
+        tools:
+          - get_portfolio_summary
+          - scan_market_regime
+          - get_market_quote
+          - get_active_orders
+          - get_order_history
+          - optimize_portfolio
+      - type: script
+        shell:
+          browser_navigate:
+            cmd: "agent-browser open $url && agent-browser wait --load networkidle && agent-browser snapshot -i"
+            description: "Navigate to a URL."
+            args:
+              url: {type: string}
+      - type: filesystem
+        tools: [read_file, read_multiple_files, search_files_content, directory_tree]
+
+  code_executor:
+    model: claude-haiku-4-5
+    description: "Python code execution specialist"
+    instruction: "You are a Python code execution specialist using the E2B sandbox."
+    toolsets:
+      - type: mcp
+        remote:
+          url: "http://localhost:8001/mcp"
+          transport_type: "streamable"
+          headers:
+            Authorization: "Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}"
+        tools: [execute_python_code]
+      - type: filesystem
+        tools: [read_file, read_multiple_files, search_files_content, directory_tree]
+
+  risk_manager:
+    model: gemini-3-flash
+    description: "Risk management specialist"
+    instruction: "You are a risk analysis specialist responsible for assessing portfolio risk."
+    toolsets:
+      - type: mcp
+        remote:
+          url: "http://localhost:8001/mcp"
+          transport_type: "streamable"
+          headers:
+            Authorization: "Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}"
+        tools: [analyze_portfolio_risk, run_technical_analysis, get_portfolio_summary]
+      - type: filesystem
+        tools: [read_file, read_multiple_files, search_files_content, directory_tree]
+
+  market_researcher:
+    model: gemini-3-flash
+    description: "Market research and macro environment analysis coordinator"
+    instruction: "You are a market research coordinator responsible for analyzing macro market conditions."
+    toolsets:
+      - type: mcp
+        remote:
+          url: "http://localhost:8001/mcp"
+          transport_type: "streamable"
+          headers:
+            Authorization: "Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}"
+        tools: [scan_market_regime, get_treasury_yield_data, get_market_quote]
+      - type: filesystem
+        tools: [read_file, read_multiple_files, search_files_content, directory_tree]
+
+  stock_analyst:
+    model: gemini-3-flash
+    description: "Individual stock analysis specialist"
+    instruction: "You are a Stock Research Analyst combining fundamental data and portfolio tools."
+    toolsets:
+      - type: mcp
+        remote:
+          url: "http://localhost:8001/mcp"
+          transport_type: "streamable"
+          headers:
+            Authorization: "Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}"
+        tools: [get_portfolio_summary, get_enriched_company_data, get_market_quote]
+      - type: filesystem
+        tools: [read_file, read_multiple_files, search_files_content, directory_tree]
+
+  trader:
+    model: gemini-3-flash
+    description: "Trading execution specialist"
+    instruction: "You are a trading execution specialist responsible for executing trades."
+    toolsets:
+      - type: mcp
+        remote:
+          url: "http://localhost:8001/mcp"
+          transport_type: "streamable"
+          headers:
+            Authorization: "Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}"
+        tools: [buy_market_order, sell_market_order, limit_order, get_active_orders]
+      - type: filesystem
+        tools: [read_file, read_multiple_files, search_files_content, directory_tree]
+
+  options_analyst:
+    model: gemini-3-flash
+    description: "Options strategy specialist"
+    instruction: "You are an options strategy specialist."
+    toolsets:
+      - type: mcp
+        remote:
+          url: "http://localhost:8001/mcp"
+          transport_type: "streamable"
+          headers:
+            Authorization: "Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}"
+        tools: [get_option_chain, get_option_market_data, calculate_option_greeks]
+      - type: filesystem
+        tools: [read_file, read_multiple_files, search_files_content, directory_tree]
