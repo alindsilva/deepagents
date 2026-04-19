@@ -1,0 +1,39 @@
+# Simple Bridge Example: Research Team
+
+models:
+  fast_model:
+    provider: openai
+    model: gpt-4o-mini
+    temperature: 0.2
+  
+  smart_model:
+    provider: anthropic
+    model: claude-3-5-sonnet-20240620
+    temperature: 0.1
+
+agents:
+  root:
+    model: smart_model
+    description: "Team coordinator that delegates research tasks."
+    instruction: |
+      You are a research coordinator. Your job is to answer user questions by delegating to the appropriate specialist.
+      Always summarize the findings of your team members.
+    sub_agents:
+      - researcher
+    toolsets:
+      - type: todo
+
+  researcher:
+    model: fast_model
+    description: "Information gatherer that searches the filesystem and performs analysis."
+    instruction: |
+      You are a researcher. Use your tools to find information requested by the coordinator.
+      Be precise and factual.
+    toolsets:
+      - type: filesystem
+      - type: shell
+      - type: script
+        shell:
+          say_hello:
+            cmd: "echo 'Hello from the researcher! I am ready to help.'"
+            description: "A friendly greeting tool."
