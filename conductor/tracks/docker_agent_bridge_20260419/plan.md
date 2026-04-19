@@ -1,5 +1,11 @@
 # Implementation Plan: Build lightweight mapping layer from docker-agent YAML to deepagents
 
+> **CRITICAL INSTRUCTION FOR CONDUCTOR:**
+> A corresponding `beads` (bd) issue hierarchy has already been created for this plan.
+> Do NOT use markdown TODOs or generic task management tools.
+> You MUST use the `bd ready`, `bd show <id>`, `bd update <id> --claim`, and `bd close <id>` commands to guide implementation and track progress according to the `bd prime` workflow.
+> Ensure that all work is pushed to the remote (`bd dolt push` and `git push`) at the end of the session.
+
 ## Phase 1: Requirements Engineering
 - [x] Task: Reverse engineer docker-agent YAML parser rules into a requirements document
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Requirements Engineering' (Protocol in workflow.md)
