@@ -33,11 +33,11 @@
 - [x] Task: Implement logic to dynamically build LangGraph agents a61dfd0e
 - [x] Task: Conductor - User Manual Verification 'Phase 5: Agent Orchestration' (Protocol in workflow.md) 19751a6f
 
-## Phase 6: CLI Entry Point and Documentation
-- [ ] Task: Implement `main.py` execution entry point
-- [ ] Task: Create sample `team.yaml`
-- [ ] Task: Write `README.md` documentation
-- [ ] Task: Conductor - User Manual Verification 'Phase 6: CLI Entry Point and Documentation' (Protocol in workflow.md)
+## Phase 6: CLI Entry Point and Documentation [checkpoint: 24c035b5]
+- [x] Task: Implement `main.py` execution entry point 8c128801
+- [x] Task: Create sample `team.yaml` 7d193a20
+- [x] Task: Write README.md documentation c10a23fe
+- [x] Task: Conductor - User Manual Verification 'Phase 6: CLI Entry Point and Documentation' (Protocol in workflow.md) 24c035b5
 
 ## Phase 7: Example Parity and Validation
 - [ ] Task: Bootstrap a simple YAML file from `docker-agent` examples and verify execution
