@@ -53,7 +53,8 @@ def test_resolve_model_with_provider_and_env_vars(monkeypatch):
     # Assert provider overrides were applied
     assert model.model == "claude-3-5-sonnet-20240620"
     assert model.temperature == 0.1
-    assert model.base_url == "https://gateway.ai.cloudflare.com/v1/test-account/test-gateway/anthropic"
+    # ChatAnthropic uses anthropic_api_url
+    assert model.anthropic_api_url == "https://gateway.ai.cloudflare.com/v1/test-account/test-gateway/anthropic"
     assert "cf-aig-authorization" in model.default_headers
     assert model.default_headers["cf-aig-authorization"] == "Bearer test-token"
 
@@ -71,7 +72,8 @@ def test_resolve_model_with_inline_base_url():
     assert "local-qwen" in models
     model = models["local-qwen"]
     assert model.model_name == "qwen3-coder:30b"
-    assert model.base_url == "http://localhost:1234/v1"
+    # ChatOpenAI uses openai_api_base
+    assert model.openai_api_base == "http://localhost:1234/v1"
 
 def test_missing_env_var_raises_error():
     yaml_content = dedent("""
