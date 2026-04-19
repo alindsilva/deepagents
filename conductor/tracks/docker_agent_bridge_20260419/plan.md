@@ -16,10 +16,10 @@
 - [x] Task: Implement basic YAML parser module dbce8482
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Project Setup & Scaffolding' (Protocol in workflow.md) e36c997f
 
-## Phase 3: Model & Provider Initialization
-- [ ] Task: Write tests for model resolution
-- [ ] Task: Implement parser for `providers` and `models` YAML blocks
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Model & Provider Initialization' (Protocol in workflow.md)
+## Phase 3: Model & Provider Initialization [checkpoint: 943ae37c]
+- [x] Task: Write tests for model resolution 794a366e
+- [x] Task: Implement parser for `providers` and `models` YAML blocks 02801673
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Model & Provider Initialization' (Protocol in workflow.md) 943ae37c
 
 ## Phase 4: Tool and MCP Mapping
 - [ ] Task: Write tests for toolset resolution
