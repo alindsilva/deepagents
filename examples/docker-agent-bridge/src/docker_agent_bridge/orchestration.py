@@ -1,6 +1,8 @@
 from typing import Any
 from deepagents.graph import create_deep_agent
 from deepagents.middleware.subagents import CompiledSubAgent
+from deepagents.middleware.summarization import SummarizationMiddleware
+from deepagents.backends import StateBackend
 from docker_agent_bridge.models import resolve_models
 from docker_agent_bridge.tools import resolve_tools
 
@@ -44,16 +46,22 @@ def build_agent_graph(config: dict[str, Any]) -> Any:
         # 2. Resolve tools (non-subagent tools)
         tools = resolve_tools(agent_data.get("toolsets", []))
         
-        # Filter out our proxy tools if we were using them to satisfy tests, 
-        # as create_deep_agent adds the real ones by default.
-        # But for this bridge, we want to allow the YAML to specify which ones to use.
-        # For simplicity, we just pass all tools resolved.
-        
         # 3. Resolve model
         model_name = agent_data.get("model")
         model = models.get(model_name)
 
-        # 4. Create the Deep Agent
+        # 4. Resolve middleware
+        middleware = []
+        num_history = agent_data.get("num_history_items")
+        if num_history:
+            # Inject summarization middleware to control history size
+            middleware.append(SummarizationMiddleware(
+                model=model,
+                backend=StateBackend(),
+                keep=("messages", num_history)
+            ))
+
+        # 5. Create the Deep Agent
         # 'skills' in create_deep_agent expects a list of paths. 
         # If skills: true is in YAML, we'll provide default skill paths.
         skills_paths = ["./skills/"] if agent_data.get("skills") is True else None
@@ -63,7 +71,8 @@ def build_agent_graph(config: dict[str, Any]) -> Any:
             system_prompt=agent_data.get("instruction"),
             tools=tools,
             subagents=subagents_specs,
-            skills=skills_paths
+            skills=skills_paths,
+            middleware=middleware
         )
 
         instantiated_agents[name] = agent
