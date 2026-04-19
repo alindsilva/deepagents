@@ -12,8 +12,8 @@
 
 ## Phase 2: Project Setup & Scaffolding
 - [x] Task: Create `pyproject.toml` and directory structure bf4faf82
-- [ ] Task: Write tests for YAML parser
-- [ ] Task: Implement basic YAML parser module
+- [x] Task: Write tests for YAML parser ace13e7a
+- [x] Task: Implement basic YAML parser module dbce8482
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Project Setup & Scaffolding' (Protocol in workflow.md)
 
 ## Phase 3: Model & Provider Initialization
