@@ -53,3 +53,13 @@ def test_parse_partial_yaml():
     
     # Optional sections should be present as empty dicts or handled gracefully
     assert config.get("models", {}) == {}
+
+def test_parse_invalid_yaml():
+    yaml_content = "agents: [unclosed list"
+    with pytest.raises(ValueError, match="Configuration is empty or invalid"):
+        parse_yaml_config(yaml_content)
+
+def test_parse_non_dict_yaml():
+    yaml_content = "- item 1\n- item 2"
+    with pytest.raises(ValueError, match="Configuration is empty or invalid"):
+        parse_yaml_config(yaml_content)

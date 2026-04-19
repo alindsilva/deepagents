@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "docker-agent-bridge"
 version = "0.1.0"
@@ -18,4 +22,5 @@ deepagents = { path = "../../libs/deepagents", editable = true }
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
 ]
