@@ -28,10 +28,10 @@
 - [x] Task: Implement custom MCP loader for docker-agent formats 05623756
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Tool and MCP Mapping' (Protocol in workflow.md) 29e3748a
 
-## Phase 5: Agent Orchestration
-- [ ] Task: Write tests for sub-agent and root agent generation
-- [ ] Task: Implement logic to dynamically build LangGraph agents
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: Agent Orchestration' (Protocol in workflow.md)
+## Phase 5: Agent Orchestration [checkpoint: 19751a6f]
+- [x] Task: Write tests for sub-agent and root agent generation 2b1c16fd
+- [x] Task: Implement logic to dynamically build LangGraph agents a61dfd0e
+- [x] Task: Conductor - User Manual Verification 'Phase 5: Agent Orchestration' (Protocol in workflow.md) 19751a6f
 
 ## Phase 6: CLI Entry Point and Documentation
 - [ ] Task: Implement `main.py` execution entry point
