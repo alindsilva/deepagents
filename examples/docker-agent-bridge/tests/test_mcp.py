@@ -64,6 +64,29 @@ def test_resolve_mcp_remote_streamable(monkeypatch):
     assert conn["url"] == "http://localhost:8001/mcp"
     assert conn["headers"]["Authorization"] == "Bearer test-key"
 
+def test_resolve_mcp_complex_headers(monkeypatch):
+    monkeypatch.setenv("CF_CLIENT_ID", "id123")
+    monkeypatch.setenv("CF_CLIENT_SECRET", "sec123")
+    
+    yaml_content = dedent("""
+        agents:
+          trader:
+            toolsets:
+              - type: mcp
+                remote:
+                  url: "https://api.casadsilva.com/mcp"
+                  transport_type: "streamable"
+                  headers:
+                    CF-Access-Client-Id: "${env.CF_CLIENT_ID}"
+                    CF-Access-Client-Secret: "${env.CF_CLIENT_SECRET}"
+    """)
+    config = parse_yaml_config(yaml_content)
+    connections = resolve_mcp_connections(config["agents"]["trader"]["toolsets"])
+    
+    conn = connections["mcp_0"]
+    assert conn["headers"]["CF-Access-Client-Id"] == "id123"
+    assert conn["headers"]["CF-Access-Client-Secret"] == "sec123"
+
 def test_resolve_mcp_skip_non_mcp():
     toolsets = [{"type": "filesystem"}]
     connections = resolve_mcp_connections(toolsets)
