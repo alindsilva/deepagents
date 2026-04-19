@@ -11,6 +11,7 @@ Deep Agents is the "batteries-included" agent harness built on LangGraph. It pro
 ## Key Capabilities
 - **Built-in Tools:** Out-of-the-box filesystem access (`read_file`, `write_file`, `grep`), shell execution (with sandboxing), and task planning (`write_todos`).
 - **Sub-agents:** Delegation to specialized sub-agents with isolated context windows to handle complex tasks iteratively.
+- **Docker Agent Bridge:** Support for parsing and executing declarative `docker-agent` YAML configuration files.
 - **MCP Support:** Native support for Model Context Protocol (MCP) clients (`langchain-mcp-adapters`) to integrate external tools.
 
 ## Design Tenets
