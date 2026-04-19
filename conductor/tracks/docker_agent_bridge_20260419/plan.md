@@ -44,7 +44,7 @@
 - [x] Task: Translate an existing `deepagents` example into YAML and verify execution parity 9fc7ce52
 - [x] Task: Conductor - User Manual Verification 'Phase 7: Example Parity and Validation' (Protocol in workflow.md) 18d3fcb8
 
-## Phase 8: Advanced Configuration Validation
-- [ ] Task: Write tests for complex provider and model options from portfolio_management team
-- [ ] Task: Write tests for remote streamable MCP connection with authentication headers
-- [ ] Task: Conductor - User Manual Verification 'Phase 8: Advanced Configuration Validation' (Protocol in workflow.md)
+## Phase 8: Advanced Configuration Validation [checkpoint: f38dd307]
+- [x] Task: Write tests for complex provider and model options from portfolio_management team 7b386e67
+- [x] Task: Write tests for remote streamable MCP connection with authentication headers c202767f
+- [x] Task: Conductor - User Manual Verification 'Phase 8: Advanced Configuration Validation' (Protocol in workflow.md) f38dd307
