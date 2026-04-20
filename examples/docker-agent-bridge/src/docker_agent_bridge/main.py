@@ -80,7 +80,7 @@ async def _run_bridge():
                 agent=BridgeRemoteAgent(graph),
                 assistant_id=f"bridge-{uuid.uuid4().hex[:8]}",
                 thread_id=str(uuid.uuid4()),
-                backend=FilesystemBackend(root_dir=os.getcwd()),
+                backend=FilesystemBackend(root_dir=os.getcwd(), virtual_mode=False),
                 initial_prompt=args.query
             )
             
@@ -142,6 +142,15 @@ async def _run_bridge():
                 print(f"\nAgent Response:\n{content}")
 
     except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+def run_bridge():
+    asyncio.run(_run_bridge())
+
+if __name__ == "__main__":
+    run_bridge()
+ as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
