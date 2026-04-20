@@ -25,7 +25,13 @@ async def build_agent_graph(config: dict[str, Any]) -> Any:
     for agent_data in agents_config.values():
         all_mcp_configs.update(resolve_mcp_connections(agent_data.get("toolsets", [])))
     
-    mcp_client = MultiServerMCPClient(all_mcp_configs) if all_mcp_configs else None
+    # CRITICAL: Strip internal tracking keys (__tools_filter__) before passing to the client
+    clean_mcp_configs = {
+        name: {k: v for k, v in cfg.items() if k != "__tools_filter__"}
+        for name, cfg in all_mcp_configs.items()
+    }
+    
+    mcp_client = MultiServerMCPClient(clean_mcp_configs) if clean_mcp_configs else None
     mcp_tools = await mcp_client.get_tools() if mcp_client else []
 
     # Memoize instantiated agents to handle hierarchies
