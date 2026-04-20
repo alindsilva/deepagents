@@ -56,12 +56,48 @@ async def build_agent_graph(config: dict[str, Any]) -> Any:
         # 2. Resolve local tools (non-MCP)
         tools = await resolve_tools(agent_data.get("toolsets", []))
         
-        # Add shared MCP tools
-        # For simplicity in this bridge, we give all shared MCP tools to all agents.
-        # production logic would filter based on 'tools:' keys in YAML toolsets.
-        tools.extend(mcp_tools)
+        # 3. Add filtered MCP tools
+        agent_mcp_configs = resolve_mcp_connections(agent_data.get("toolsets", []))
+        for server_name, conn_config in agent_mcp_configs.items():
+            allowlist = conn_config.get("__tools_filter__")
+            
+            # Find tools belonging to this specific MCP server
+            # langchain-mcp-adapters usually uses names like "server:tool" or just "tool"
+            server_tools = [
+                t for t in mcp_tools 
+                if t.name.startswith(f"{server_name}:") or any(server_name in str(getattr(t, "metadata", {})) for _ in [0])
+            ]
+            
+            # If server_tools is empty (common if MultiServerMCPClient flattened them),
+            # we fallback to searching all mcp_tools by name if an allowlist exists.
+            if not server_tools and allowlist:
+                server_tools = [t for t in mcp_tools if t.name in allowlist]
+            elif not server_tools and not allowlist:
+                # If no allowlist and server not found, we assume all mcp_tools for now
+                # to maintain the "everything" fallback.
+                server_tools = mcp_tools
+
+            if allowlist:
+                # Filter by name (checking both bare name and prefixed name)
+                filtered = [
+                    t for t in server_tools 
+                    if t.name in allowlist or (":" in t.name and t.name.split(":", 1)[1] in allowlist)
+                ]
+                tools.extend(filtered)
+            else:
+                # No allowlist, add all tools from this server
+                tools.extend(server_tools)
         
-        # 3. Resolve model
+        # Remove duplicates while preserving order
+        seen_tools = set()
+        unique_tools = []
+        for t in tools:
+            if t.name not in seen_tools:
+                unique_tools.append(t)
+                seen_tools.add(t.name)
+        tools = unique_tools
+
+        # 4. Resolve model
         model_name = agent_data.get("model")
         model = models.get(model_name)
         if isinstance(model, Exception):

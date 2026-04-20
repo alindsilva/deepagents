@@ -57,6 +57,9 @@ def resolve_mcp_connections(toolsets_config: list[dict[str, Any]]) -> dict[str, 
             if not server_name:
                 server_name = f"mcp_{mcp_counter}"
                 mcp_counter += 1
+            
+            # Preserve the tools allowlist if present
+            conn_config["__tools_filter__"] = toolset.get("tools")
             connections[server_name] = conn_config
 
     return connections
