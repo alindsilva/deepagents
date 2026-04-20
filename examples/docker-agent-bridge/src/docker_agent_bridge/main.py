@@ -3,9 +3,14 @@ import sys
 import asyncio
 from docker_agent_bridge.parser import parse_yaml_config
 from docker_agent_bridge.orchestration import build_agent_graph
+from docker_agent_bridge.models import resolve_models
 
 async def _run_bridge():
     """CLI entry point for the docker-agent-bridge."""
+    import warnings
+    # Suppress noisy LangChain warnings about provider-specific parameters
+    warnings.filterwarnings("ignore", message=".*service_tier.*", category=UserWarning)
+    
     parser = argparse.ArgumentParser(description="Docker Agent to Deep Agents Bridge")
     parser.add_argument("config", help="Path to the docker-agent YAML config file")
     parser.add_argument("--query", help="Initial query for the agent", default=None)
@@ -86,8 +91,6 @@ async def _run_bridge():
             
             # 3. Hack: Force _remote_agent to return our proxy so /model works
             # DeepAgentsApp.action_switch_model checks isinstance(self._agent, RemoteAgent)
-            # but we can't easily inherit because of heavy dependencies.
-            # Instead, we just make our object look like it.
             from deepagents_cli.remote_client import RemoteAgent
             BridgeRemoteAgent.__bases__ = (RemoteAgent,)
 
@@ -142,15 +145,6 @@ async def _run_bridge():
                 print(f"\nAgent Response:\n{content}")
 
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-def run_bridge():
-    asyncio.run(_run_bridge())
-
-if __name__ == "__main__":
-    run_bridge()
- as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 

@@ -77,7 +77,6 @@ async def build_agent_graph(config: dict[str, Any]) -> Any:
         middleware = [ConfigurableModelMiddleware()]
 
         # 5. Create the Deep Agent
-        # Standard skill locations to search if skills: true
         skills_paths = None
         if agent_data.get("skills") is True:
             skills_paths = []
@@ -85,9 +84,13 @@ async def build_agent_graph(config: dict[str, Any]) -> Any:
                 if os.path.isdir(candidate):
                     skills_paths.append(candidate)
             
-            # Fallback to current directory if no standard folders found
             if not skills_paths:
                 skills_paths = ["./"]
+
+        # Support native deepagents memory (AGENTS.md files)
+        memory_paths = agent_data.get("memory")
+        if isinstance(memory_paths, str):
+            memory_paths = [memory_paths]
 
         agent = create_deep_agent(
             model=model,
@@ -95,6 +98,7 @@ async def build_agent_graph(config: dict[str, Any]) -> Any:
             tools=tools,
             subagents=subagents_specs,
             skills=skills_paths,
+            memory=memory_paths,
             middleware=middleware
         )
 

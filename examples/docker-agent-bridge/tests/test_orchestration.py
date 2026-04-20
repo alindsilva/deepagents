@@ -52,6 +52,27 @@ async def test_build_simple_agent(mock_resolve_tools, mock_resolve_models, mock_
 @patch("docker_agent_bridge.orchestration.create_deep_agent")
 @patch("docker_agent_bridge.orchestration.resolve_models")
 @patch("docker_agent_bridge.orchestration.resolve_tools")
+async def test_build_agent_with_memory(mock_resolve_tools, mock_resolve_models, mock_create_deep_agent):
+    mock_model = MagicMock()
+    mock_resolve_models.return_value = {"default": mock_model}
+    mock_resolve_tools.return_value = []
+    
+    yaml_content = dedent("""
+        agents:
+          root:
+            model: default
+            memory: [data/AGENTS.md, config/RULES.md]
+    """)
+    config = parse_yaml_config(yaml_content)
+    await build_agent_graph(config)
+    
+    args, kwargs = mock_create_deep_agent.call_args
+    assert kwargs["memory"] == ["data/AGENTS.md", "config/RULES.md"]
+
+@pytest.mark.asyncio
+@patch("docker_agent_bridge.orchestration.create_deep_agent")
+@patch("docker_agent_bridge.orchestration.resolve_models")
+@patch("docker_agent_bridge.orchestration.resolve_tools")
 async def test_build_agent_hierarchy(mock_resolve_tools, mock_resolve_models, mock_create_deep_agent):
     # Mock models
     mock_model = MagicMock()
