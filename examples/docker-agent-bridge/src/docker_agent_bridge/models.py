@@ -101,61 +101,69 @@ def resolve_models(config: dict[str, Any]) -> dict[str, Any]:
         is_gateway = base_url and ("gateway" in base_url or "cloudflare" in base_url or "openclaw" in base_url)
         
         if is_gateway:
-            # Check if this is a native Anthropic gateway endpoint
-            if "anthropic" in base_url and not ("/compat" in base_url or "/openai" in base_url):
-                effective_provider = "anthropic"
-            else:
+            # Determine if we should use OpenAI compatibility (the /compat endpoint)
+            # We use OpenAI provider for any Cloudflare endpoint ending in /compat
+            if base_url.endswith("/compat") or base_url.endswith("/compat/"):
                 effective_provider = "openai"
                 
-                if "gateway.ai.cloudflare.com" in base_url:
-                    parts = base_url.split("/")
-                    if len(parts) >= 6:
-                        base_url = "/".join(parts[:6]) + "/compat"
+                # Cloudflare Model Prefixing: {provider}/{model}
+                prefix = "openai"
+                if "google" in base_url or "gemini" in base_url or "google" in provider_name:
+                    prefix = "google-ai-studio"
+                elif "anthropic" in base_url or "anthropic" in provider_name:
+                    prefix = "anthropic"
+                elif "mistral" in base_url or "mistral" in provider_name:
+                    prefix = "mistral"
                 
-                if "/compat" in base_url:
-                    prefix = "openai"
-                    if "google" in base_url or "gemini" in base_url or "google" in provider_name:
-                        prefix = "google-ai-studio"
-                    elif "anthropic" in base_url or "anthropic" in provider_name:
-                        prefix = "anthropic"
-                    elif "mistral" in base_url or "mistral" in provider_name:
-                        prefix = "mistral"
-                    
-                    if "/" not in model_name:
-                        model_name = f"{prefix}/{model_name}"
+                if "/" not in model_name:
+                    model_name = f"{prefix}/{model_name}"
+            
+            # For native endpoints, respect the provider name
+            elif "anthropic" in base_url:
+                effective_provider = "anthropic"
+            elif "google" in base_url or "gemini" in base_url:
+                effective_provider = "google_genai"
 
+            # Cleanup URL
             if base_url:
                 base_url = base_url.replace("/chat/completions", "").rstrip("/")
 
         # 7. Authentication Extraction
         api_key = None
-        # Try to find a provider API key explicitly passed in headers
-        if "x-goog-api-key" in interpolated_headers:
-            api_key = interpolated_headers.pop("x-goog-api-key")
-        elif "Authorization" in interpolated_headers:
-            auth = interpolated_headers.pop("Authorization")
-            if auth.startswith("Bearer "):
-                api_key = auth[7:]
-            else:
-                api_key = auth
         
-        # If no key found in headers, fallback to environment
+        # Cloudflare Special Case: The 'cf-aig-authorization' header can be used as the api_key
+        # for the OpenAI provider if it contains the Bearer token.
+        if is_gateway and effective_provider == "openai":
+            if "cf-aig-authorization" in interpolated_headers:
+                auth = interpolated_headers["cf-aig-authorization"] # Don't pop yet, keep for other providers
+                if auth.startswith("Bearer "):
+                    api_key = auth[7:]
+                else:
+                    api_key = auth
+
+        # Standard extraction
+        if not api_key:
+            if "x-goog-api-key" in interpolated_headers:
+                api_key = interpolated_headers.get("x-goog-api-key")
+            elif "Authorization" in interpolated_headers:
+                auth = interpolated_headers.get("Authorization")
+                if auth.startswith("Bearer "):
+                    api_key = auth[7:]
+                else:
+                    api_key = auth
+
+        # Fallback to environment
         if not api_key:
             if effective_provider == "openai":
-                api_key = os.environ.get("OPENAI_API_KEY")
+                api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("CF_AIG_TOKEN")
             elif effective_provider == "anthropic":
                 api_key = os.environ.get("ANTHROPIC_API_KEY")
             elif effective_provider == "google_genai":
                 api_key = os.environ.get("GOOGLE_API_KEY")
-        
-        # SPECIAL CASE: For gateways using OpenAI provider, the API key might need
-        # to be the gateway token itself if the backend auth is handled by Cloudflare.
-        # But for /compat endpoint, we usually pass the actual backend key.
-        # We'll stick to the actual backend keys for now as sourced from .env.
 
         try:
-            # Prepare arguments for init_chat_model
-            # Start with explicit configuration from YAML
+            
+            # Prepare final arguments for init_chat_model
             model_args = {
                 "model": model_name,
                 "model_provider": effective_provider,
@@ -163,14 +171,23 @@ def resolve_models(config: dict[str, Any]) -> dict[str, Any]:
                 "max_tokens": resolved_config.get("max_tokens"),
             }
 
-            # Add optional args only if they are not None
             if api_key:
-                model_args["api_key"] = api_key
+                if effective_provider == "google_genai":
+                    model_args["google_api_key"] = api_key
+                else:
+                    model_args["api_key"] = api_key
+            
             if base_url:
                 model_args["base_url"] = base_url
             
-            # Google GenAI strictly forbids 'default_headers' even if None
-            if effective_provider != "google_genai" and interpolated_headers:
+            # Header handling
+            if effective_provider == "google_genai":
+                if interpolated_headers:
+                    # Filter out standard keys to avoid duplication
+                    filtered = {k: v for k, v in interpolated_headers.items() if k.lower() not in ["x-goog-api-key", "authorization"]}
+                    if filtered:
+                        model_args["additional_headers"] = filtered
+            elif interpolated_headers:
                 model_args["default_headers"] = interpolated_headers
 
             from deepagents.profiles import _get_harness_profile
@@ -181,11 +198,10 @@ def resolve_models(config: dict[str, Any]) -> dict[str, Any]:
             if profile.init_kwargs_factory:
                 init_kwargs.update(profile.init_kwargs_factory())
             
-            # Filter init_kwargs for gateways
             if is_gateway:
                 init_kwargs = {k: v for k, v in init_kwargs.items() if v is not False}
 
-            # Merge provider_opts, excluding those handled elsewhere
+            # provider_opts
             provider_opts = resolved_config.get("provider_opts", {}).copy()
             if effective_provider != "anthropic":
                 provider_opts.pop("service_tier", None)

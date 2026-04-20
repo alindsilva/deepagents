@@ -22,17 +22,17 @@ async def _run_bridge():
         # Handle TUI mode
         if args.tui:
             from deepagents_cli.app import DeepAgentsApp
-            from deepagents.backends import CompositeBackend
+            from deepagents.backends import CompositeBackend, StateBackend
             import uuid
 
             app = DeepAgentsApp(
                 agent=graph,
                 assistant_id=f"bridge-{uuid.uuid4().hex[:8]}",
                 thread_id=str(uuid.uuid4()),
-                backend=CompositeBackend(),
+                backend=CompositeBackend(default=StateBackend(), routes={}),
                 initial_prompt=args.query
             )
-            app.run()
+            await app.run_async()
             return
 
         # Maintain session state for basic CLI loop
