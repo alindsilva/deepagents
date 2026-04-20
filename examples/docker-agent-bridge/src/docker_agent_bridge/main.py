@@ -30,6 +30,7 @@ async def _run_bridge():
             from deepagents.backends import FilesystemBackend
             from deepagents_cli.config import ModelResult
             import deepagents_cli.config as cli_config
+            from deepagents_cli.remote_client import RemoteAgent
             import uuid
             import os
             from typing import AsyncIterator
@@ -53,14 +54,15 @@ async def _run_bridge():
             cli_config.create_model = bridge_create_model
 
             # 2. BridgeRemoteAgent to mimic a server-backed session
-            class BridgeRemoteAgent:
+            class BridgeRemoteAgent(RemoteAgent):
                 def __init__(self, graph):
+                    # Initialize RemoteAgent with dummy data to satisfy inheritance
+                    super().__init__(url="http://local-bridge")
                     self._graph = graph
 
                 async def astream(self, input, stream_mode=None, config=None, context=None, **kwargs) -> AsyncIterator:
                     # RemoteAgent.astream yields (ns, mode, data)
                     # Local graph.astream yields (mode, data) OR messages depending on mode
-                    # The TUI expects ns-tuple as first element
                     async for mode, data in self._graph.astream(
                         input, 
                         stream_mode=stream_mode or ["messages", "updates"],
@@ -89,11 +91,6 @@ async def _run_bridge():
                 initial_prompt=args.query
             )
             
-            # 3. Hack: Force _remote_agent to return our proxy so /model works
-            # DeepAgentsApp.action_switch_model checks isinstance(self._agent, RemoteAgent)
-            from deepagents_cli.remote_client import RemoteAgent
-            BridgeRemoteAgent.__bases__ = (RemoteAgent,)
-
             await app.run_async()
             return
 
