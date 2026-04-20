@@ -61,7 +61,13 @@
 - [x] Task: Verify TUI mode with `portfolio_management_with_beads.yaml`
 - [x] Task: Conductor - User Manual Verification 'Phase 10: TUI Integration' (Protocol in workflow.md)
 
-## Phase 11: Review Refinement [checkpoint: final]
-- [x] Task: Remove shadow tools from tools.py to let SDK handles built-ins
-- [x] Task: Refine MCP lifecycle for long-running TUI sessions
-- [x] Task: Conductor - User Manual Verification 'Phase 11: Review Refinement' (Protocol in workflow.md)
+## Phase 11: Review Refinement [checkpoint: 5fe67c10]
+- [x] Task: Remove shadow tools from tools.py to let SDK handles built-ins 5fe67c10
+- [x] Task: Refine MCP lifecycle for long-running TUI sessions 5fe67c10
+- [x] Task: Conductor - User Manual Verification 'Phase 11: Review Refinement' (Protocol in workflow.md) 5fe67c10
+
+## Phase 12: Advanced TUI Support & Model Switching
+- [x] Task: Implement `BridgeRemoteAgent` to unlock `/model` and `/clear` in TUI
+- [x] Task: Monkey-patch `create_model` to apply bridge logic during runtime model swaps
+- [x] Task: Improve skill discovery to find `.agents/skills` natively
+- [x] Task: Conductor - User Manual Verification 'Phase 12: Advanced TUI Support' (Protocol in workflow.md)

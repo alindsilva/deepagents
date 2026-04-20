@@ -72,6 +72,10 @@ async def build_agent_graph(config: dict[str, Any]) -> Any:
         # 4. Resolve middleware
         num_history = agent_data.get("num_history_items")
         
+        # Add ConfigurableModelMiddleware to support /model in TUI
+        from deepagents_cli.configurable_model import ConfigurableModelMiddleware
+        middleware = [ConfigurableModelMiddleware()]
+
         # 5. Create the Deep Agent
         # Standard skill locations to search if skills: true
         skills_paths = None
@@ -91,7 +95,7 @@ async def build_agent_graph(config: dict[str, Any]) -> Any:
             tools=tools,
             subagents=subagents_specs,
             skills=skills_paths,
-            middleware=None 
+            middleware=middleware
         )
 
         instantiated_agents[name] = agent
