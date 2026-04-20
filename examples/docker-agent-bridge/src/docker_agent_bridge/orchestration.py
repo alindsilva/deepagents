@@ -1,151 +1,111 @@
 import os
-from typing import Any
+from typing import Any, Dict, List, Optional, Sequence
 from deepagents.graph import create_deep_agent
-from deepagents.middleware.summarization import SummarizationMiddleware
 from deepagents.backends import StateBackend
+from deepagents_cli.configurable_model import ConfigurableModelMiddleware
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_core.tools import BaseTool
+
 from docker_agent_bridge.models import resolve_models
 from docker_agent_bridge.tools import resolve_tools
-from docker_agent_bridge.mcp import resolve_mcp_connections
-from langchain_mcp_adapters.client import MultiServerMCPClient
+from docker_agent_bridge.mcp import resolve_mcp_connections, ScopedMCPClient
 
-async def build_agent_graph(config: dict[str, Any]) -> Any:
-    """Build the agent LangGraph from docker-agent YAML configuration.
-
-    Args:
-        config: The parsed YAML configuration.
-
-    Returns:
-        The compiled root agent graph.
-    """
-    models = resolve_models(config)
-    agents_config = config.get("agents", {})
-
-    # 1. Aggregate all MCP connections for a shared client
-    all_mcp_configs = {}
-    for agent_data in agents_config.values():
-        all_mcp_configs.update(resolve_mcp_connections(agent_data.get("toolsets", [])))
+class AgentBuilder:
+    """Refined recursive builder for Deep Agent graphs defined in YAML."""
     
-    # CRITICAL: Strip internal tracking keys (__tools_filter__) before passing to the client
-    clean_mcp_configs = {
-        name: {k: v for k, v in cfg.items() if k != "__tools_filter__"}
-        for name, cfg in all_mcp_configs.items()
-    }
-    
-    mcp_client = MultiServerMCPClient(clean_mcp_configs) if clean_mcp_configs else None
-    mcp_tools = await mcp_client.get_tools() if mcp_client else []
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.agents_config = config.get("agents", {})
+        self.models = resolve_models(config)
+        self.instantiated_agents = {}
+        self.scoped_mcp_client: Optional[ScopedMCPClient] = None
 
-    # Memoize instantiated agents to handle hierarchies
-    instantiated_agents = {}
+    async def initialize(self):
+        """Perform async initialization like loading shared MCP tools."""
+        all_mcp_configs = {}
+        for agent_data in self.agents_config.values():
+            all_mcp_configs.update(resolve_mcp_connections(agent_data.get("toolsets", [])))
+        
+        # Clean configs for MultiServerMCPClient
+        clean_mcp_configs = {
+            name: {k: v for k, v in cfg.items() if k != "__tools_filter__"}
+            for name, cfg in all_mcp_configs.items()
+        }
+        
+        if clean_mcp_configs:
+            mcp_client = MultiServerMCPClient(clean_mcp_configs)
+            mcp_tools = await mcp_client.get_tools()
+            self.scoped_mcp_client = ScopedMCPClient(mcp_tools)
 
-    async def get_agent(name: str):
-        if name in instantiated_agents:
-            return instantiated_agents[name]
+    async def build(self, agent_name: str = "root") -> Any:
+        """Recursively build the agent graph."""
+        if agent_name in self.instantiated_agents:
+            return self.instantiated_agents[agent_name]
 
-        agent_data = agents_config.get(name)
-        if not agent_data:
-            raise ValueError(f"Agent '{name}' not found in configuration")
+        data = self.agents_config.get(agent_name)
+        if not data:
+            raise ValueError(f"Agent '{agent_name}' not found in configuration")
 
-        # 1. Resolve sub-agents (recursive)
-        sub_agent_names = agent_data.get("sub_agents", [])
-        subagents_specs = []
-        for sub_name in sub_agent_names:
-            sub_graph = await get_agent(sub_name)
-            sub_config = agents_config[sub_name]
-            
-            # Wrap for deepagents middleware
-            subagents_specs.append({
+        # 1. Resolve recursive sub-agents
+        subagents = []
+        for sub_name in data.get("sub_agents", []):
+            sub_graph = await self.build(sub_name)
+            subagents.append({
                 "name": sub_name,
-                "description": sub_config.get("description", ""),
+                "description": self.agents_config[sub_name].get("description", ""),
                 "runnable": sub_graph
             })
 
-        # 2. Resolve local tools (non-MCP)
-        tools = await resolve_tools(agent_data.get("toolsets", []))
+        # 2. Resolve tools (local + filtered MCP)
+        tools = await resolve_tools(data.get("toolsets", []))
+        if self.scoped_mcp_client:
+            tools.extend(self.scoped_mcp_client.get_tools_for_agent(data.get("toolsets", [])))
         
-        # 3. Add filtered MCP tools
-        agent_mcp_configs = resolve_mcp_connections(agent_data.get("toolsets", []))
-        for server_name, conn_config in agent_mcp_configs.items():
-            allowlist = conn_config.get("__tools_filter__")
-            
-            # Find tools belonging to this specific MCP server
-            # langchain-mcp-adapters usually uses names like "server:tool" or just "tool"
-            server_tools = [
-                t for t in mcp_tools 
-                if t.name.startswith(f"{server_name}:") or any(server_name in str(getattr(t, "metadata", {})) for _ in [0])
-            ]
-            
-            # If server_tools is empty (common if MultiServerMCPClient flattened them),
-            # we fallback to searching all mcp_tools by name if an allowlist exists.
-            if not server_tools and allowlist:
-                server_tools = [t for t in mcp_tools if t.name in allowlist]
-            elif not server_tools and not allowlist:
-                # If no allowlist and server not found, we assume all mcp_tools for now
-                # to maintain the "everything" fallback.
-                server_tools = mcp_tools
+        # De-duplicate tools
+        seen = set()
+        tools = [t for t in tools if t.name not in seen and not seen.add(t.name)]
 
-            if allowlist:
-                # Filter by name (checking both bare name and prefixed name)
-                filtered = [
-                    t for t in server_tools 
-                    if t.name in allowlist or (":" in t.name and t.name.split(":", 1)[1] in allowlist)
-                ]
-                tools.extend(filtered)
-            else:
-                # No allowlist, add all tools from this server
-                tools.extend(server_tools)
-        
-        # Remove duplicates while preserving order
-        seen_tools = set()
-        unique_tools = []
-        for t in tools:
-            if t.name not in seen_tools:
-                unique_tools.append(t)
-                seen_tools.add(t.name)
-        tools = unique_tools
+        # 3. Resolve Model
+        model_key = data.get("model")
+        model = self.models.get(model_key)
+        if isinstance(model, Exception) or not model:
+            raise RuntimeError(f"Invalid model '{model_key}' for agent '{agent_name}'")
 
-        # 4. Resolve model
-        model_name = agent_data.get("model")
-        model = models.get(model_name)
-        if isinstance(model, Exception):
-            raise RuntimeError(f"Failed to initialize model '{model_name}' for agent '{name}': {model}")
-        if not model:
-            raise ValueError(f"Model '{model_name}' not found for agent '{name}'")
-
-        # 4. Resolve middleware
-        num_history = agent_data.get("num_history_items")
-        
-        # Add ConfigurableModelMiddleware to support /model in TUI
-        from deepagents_cli.configurable_model import ConfigurableModelMiddleware
-        middleware = [ConfigurableModelMiddleware()]
-
-        # 5. Create the Deep Agent
-        skills_paths = None
-        if agent_data.get("skills") is True:
-            skills_paths = []
-            for candidate in ["./skills/", "./.agents/skills/", "./.claude/skills/"]:
-                if os.path.isdir(candidate):
-                    skills_paths.append(candidate)
-            
-            if not skills_paths:
-                skills_paths = ["./"]
-
-        # Support native deepagents memory (AGENTS.md files)
-        memory_paths = agent_data.get("memory")
+        # 4. Resolve Skills and Memory
+        skills_paths = self._resolve_skills(data)
+        memory_paths = data.get("memory")
         if isinstance(memory_paths, str):
             memory_paths = [memory_paths]
 
+        # 5. Instantiate with CLI Middleware for TUI support
+        middleware = [ConfigurableModelMiddleware()] if agent_name == "root" else []
+
         agent = create_deep_agent(
             model=model,
-            system_prompt=agent_data.get("instruction"),
+            system_prompt=data.get("instruction"),
             tools=tools,
-            subagents=subagents_specs,
+            subagents=subagents,
             skills=skills_paths,
             memory=memory_paths,
             middleware=middleware
         )
 
-        instantiated_agents[name] = agent
+        self.instantiated_agents[agent_name] = agent
         return agent
 
-    # The entry point is always the 'root' agent
-    return await get_agent("root")
+    def _resolve_skills(self, data: Dict[str, Any]) -> Optional[List[str]]:
+        if data.get("skills") is not True:
+            return None
+        
+        paths = []
+        candidates = ["./skills/", "./.agents/skills/", "./.claude/skills/"]
+        for c in candidates:
+            if os.path.isdir(c):
+                paths.append(c)
+        return paths or ["./"]
+
+async def build_agent_graph(config: Dict[str, Any]) -> Any:
+    """Entry point for building the agent graph using the AgentBuilder."""
+    builder = AgentBuilder(config)
+    await builder.initialize()
+    return await builder.build("root")

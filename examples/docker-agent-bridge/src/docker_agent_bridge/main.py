@@ -26,78 +26,13 @@ async def _run_bridge():
 
         # Handle TUI mode
         if args.tui:
-            from deepagents_cli.app import DeepAgentsApp
-            from deepagents.backends import FilesystemBackend
-            from deepagents_cli.config import ModelResult
-            import deepagents_cli.config as cli_config
-            from deepagents_cli.remote_client import RemoteAgent
-            import uuid
-            import os
-            from typing import AsyncIterator
-
-            # 1. Monkey-patch create_model to support bridge-resolved models
-            original_create_model = cli_config.create_model
+            from docker_agent_bridge.adapter import run_bridge_tui
             resolved_models = resolve_models(config)
-
-            def bridge_create_model(model_spec=None, **kwargs):
-                if model_spec in resolved_models:
-                    model = resolved_models[model_spec]
-                    if not isinstance(model, Exception):
-                        return ModelResult(
-                            model=model,
-                            model_name=model_spec,
-                            provider="bridge",
-                            context_limit=128000
-                        )
-                return original_create_model(model_spec, **kwargs)
-
-            cli_config.create_model = bridge_create_model
-
-            # 2. BridgeRemoteAgent to mimic a server-backed session
-            class BridgeRemoteAgent(RemoteAgent):
-                def __init__(self, graph):
-                    # Initialize RemoteAgent with dummy data to satisfy inheritance
-                    super().__init__(url="http://local-bridge")
-                    self._graph = graph
-
-                async def astream(self, input, stream_mode=None, config=None, context=None, **kwargs) -> AsyncIterator:
-                    # RemoteAgent.astream yields (ns, mode, data)
-                    # Local graph.astream yields (mode, data) OR messages depending on mode
-                    async for mode, data in self._graph.astream(
-                        input, 
-                        stream_mode=stream_mode or ["messages", "updates"],
-                        config=config,
-                        context=context
-                    ):
-                        yield ((), mode, data)
-
-                async def aget_state(self, config):
-                    return await self._graph.aget_state(config)
-
-                async def aupdate_state(self, config, values):
-                    return await self._graph.aupdate_state(config, values)
-
-                async def aensure_thread(self, config):
-                    pass # Not needed for local graph
-
-                def with_config(self, config):
-                    return self
-
-            app = DeepAgentsApp(
-                agent=BridgeRemoteAgent(graph),
-                assistant_id=f"bridge-{uuid.uuid4().hex[:8]}",
-                thread_id=str(uuid.uuid4()),
-                backend=FilesystemBackend(root_dir=os.getcwd(), virtual_mode=False),
-                initial_prompt=args.query
-            )
-            
-            await app.run_async()
+            await run_bridge_tui(graph, resolved_models, initial_prompt=args.query)
             return
 
         # Maintain session state for basic CLI loop
         state = {"messages": []}
-        
-        # Handle initial query if provided
         initial_query = args.query
         
         print("\nBridge ready. Type your query (or 'exit' to quit):")
@@ -105,7 +40,7 @@ async def _run_bridge():
         while True:
             if initial_query:
                 query = initial_query
-                initial_query = None # Clear after first turn
+                initial_query = None 
             else:
                 try:
                     query = input("\n> ")
@@ -116,22 +51,14 @@ async def _run_bridge():
                 break
 
             print(f"\n[Invoking Root Agent...]")
-            
-            # Update state with new user message
             state["messages"].append({"role": "user", "content": query})
-            
-            # Run the agent (ainvoke returns final state)
             state = await graph.ainvoke(state)
 
-            # Print final message content
             if "messages" in state and state["messages"]:
                 last_message = state["messages"][-1]
-                
-                # Extract content string
                 raw_content = getattr(last_message, "content", "")
                 
                 if isinstance(raw_content, list):
-                    # Join all text blocks, ignoring metadata/signatures
                     content = "\n".join(
                         block["text"] for block in raw_content 
                         if isinstance(block, dict) and block.get("type") == "text"

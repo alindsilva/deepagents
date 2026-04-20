@@ -1,5 +1,6 @@
 import os
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Optional
 from langchain.chat_models import init_chat_model
 from docker_agent_bridge.utils import interpolate_env_vars
 from deepagents.profiles._harness_profiles import _HarnessProfile, _register_harness_profile
@@ -15,35 +16,65 @@ ALIASES = {
 }
 
 def register_custom_profiles():
-    """Register dynamic profiles for custom providers like Cloudflare.
-    
-    This ensures that deepagents middleware and initialization logic doesn't
-    inject provider-specific parameters (like OpenAI's Responses API) that
-    custom gateways don't support.
-    """
-    # Cloudflare Gateway Profile
+    """Register dynamic profiles for custom providers like Cloudflare."""
     _register_harness_profile(
         "cloudflare",
-        _HarnessProfile(
-            init_kwargs={
-                "use_responses_api": False,
-                "store": False,
-            }
-        )
+        _HarnessProfile(init_kwargs={"use_responses_api": False, "store": False})
     )
 
 # Initialize custom profiles on module load
 register_custom_profiles()
 
+@dataclass
+class GatewayConfig:
+    """Standardized gateway configuration resolved from YAML."""
+    effective_provider: str
+    model_name: str
+    base_url: Optional[str]
+    is_gateway: bool
+
+class GatewayResolver:
+    """Helper that formalizes Cloudflare and other gateway resolution patterns."""
+    
+    @staticmethod
+    def resolve(base_url: Optional[str], model_name: str, provider_name: str) -> GatewayConfig:
+        is_gateway = base_url and any(x in base_url for x in ["gateway", "cloudflare", "openclaw"])
+        
+        if not is_gateway:
+            # Not a gateway, use standard detection (handled in resolve_models)
+            return GatewayConfig(effective_provider="", model_name=model_name, base_url=base_url, is_gateway=False)
+
+        # Standardize Cloudflare endpoints
+        if "gateway.ai.cloudflare.com" in base_url:
+            parts = base_url.split("/")
+            if len(parts) >= 6 and not ("/compat" in base_url or "/openai" in base_url or "/anthropic" in base_url or "/google" in base_url):
+                 # Default to /compat for unspecialized cloudflare URLs
+                 base_url = "/".join(parts[:6]) + "/compat"
+
+        # 1. OpenAI Compatibility (/compat)
+        if base_url.endswith("/compat") or base_url.endswith("/compat/"):
+            prefix = "openai"
+            if any(x in base_url or x in provider_name for x in ["google", "gemini"]):
+                prefix = "google-ai-studio"
+            elif any(x in base_url or x in provider_name for x in ["anthropic"]):
+                prefix = "anthropic"
+            elif any(x in base_url or x in provider_name for x in ["mistral"]):
+                prefix = "mistral"
+            
+            standardized_model = f"{prefix}/{model_name}" if "/" not in model_name else model_name
+            return GatewayConfig(effective_provider="openai", model_name=standardized_model, base_url=base_url, is_gateway=True)
+
+        # 2. Native Gateway Endpoints
+        if "anthropic" in base_url:
+            return GatewayConfig(effective_provider="anthropic", model_name=model_name, base_url=base_url, is_gateway=True)
+        if "google" in base_url or "gemini" in base_url:
+            return GatewayConfig(effective_provider="google_genai", model_name=model_name, base_url=base_url, is_gateway=True)
+
+        # Fallback to OpenAI for unknown gateways
+        return GatewayConfig(effective_provider="openai", model_name=model_name, base_url=base_url, is_gateway=True)
+
 def resolve_models(config: dict[str, Any]) -> dict[str, Any]:
-    """Parse providers and models blocks into LangChain chat models.
-
-    Args:
-        config: The parsed YAML configuration.
-
-    Returns:
-        A mapping of model names to instantiated LangChain chat models.
-    """
+    """Parse providers and models blocks into LangChain chat models."""
     providers = config.get("providers", {})
     models_config = config.get("models", {})
     resolved_models = {}
@@ -51,167 +82,83 @@ def resolve_models(config: dict[str, Any]) -> dict[str, Any]:
     for name, model_data in models_config.items():
         provider_name = model_data.get("provider")
         model_name = model_data.get("model")
-        
-        # 1. Start with base config
         resolved_config = model_data.copy()
         
-        # 2. Apply Custom Provider Defaults
+        # Merge Provider Defaults
         if provider_name in providers:
-            p_config = providers[provider_name]
-            if not resolved_config.get("base_url") and p_config.get("base_url"):
-                resolved_config["base_url"] = p_config["base_url"]
-            
-            merged_headers = p_config.get("headers", {}).copy()
-            merged_headers.update(resolved_config.get("headers", {}))
-            resolved_config["headers"] = merged_headers
-            
-            if "api_type" not in resolved_config and p_config.get("api_type"):
-                resolved_config["api_type"] = p_config["api_type"]
-        
-        # 3. Apply Built-in Alias Defaults
+            p_cfg = providers[provider_name]
+            resolved_config.setdefault("base_url", p_cfg.get("base_url"))
+            resolved_config.setdefault("api_type", p_cfg.get("api_type"))
+            headers = p_cfg.get("headers", {}).copy()
+            headers.update(resolved_config.get("headers", {}))
+            resolved_config["headers"] = headers
         elif provider_name in ALIASES:
             alias = ALIASES[provider_name]
-            if not resolved_config.get("base_url"):
-                resolved_config["base_url"] = alias["base_url"]
-            if "api_type" not in resolved_config:
-                resolved_config["api_type"] = alias["api_type"]
+            resolved_config.setdefault("base_url", alias["base_url"])
+            resolved_config.setdefault("api_type", alias["api_type"])
 
-        # 4. Resolve Effective Provider / API Type
-        api_type = resolved_config.get("api_type")
-        effective_provider = api_type if api_type else provider_name
+        # Determine Effective Provider and Gateway Logic
+        base_url = interpolate_env_vars(resolved_config.get("base_url")) if resolved_config.get("base_url") else None
+        gw = GatewayResolver.resolve(base_url, model_name, provider_name)
         
-        if effective_provider in ["openai_chatcompletions", "openai_responses"]:
-            effective_provider = "openai"
-        elif effective_provider == "google":
-            effective_provider = "google_genai"
-        elif effective_provider == "dmr":
-            effective_provider = "openai"
-        
-        # 5. Interpolation
-        base_url = resolved_config.get("base_url")
-        if base_url:
-            base_url = interpolate_env_vars(base_url)
-        
-        headers = resolved_config.get("headers", {})
-        interpolated_headers = {}
-        for k, v in headers.items():
-            interpolated_headers[k] = interpolate_env_vars(v)
+        effective_provider = gw.effective_provider or resolved_config.get("api_type") or provider_name
+        model_name = gw.model_name
+        base_url = gw.base_url
 
-        # 6. Gateway Logic Override
-        is_gateway = base_url and ("gateway" in base_url or "cloudflare" in base_url or "openclaw" in base_url)
-        
-        if is_gateway:
-            # Determine if we should use OpenAI compatibility (the /compat endpoint)
-            # We use OpenAI provider for any Cloudflare endpoint ending in /compat
-            if base_url.endswith("/compat") or base_url.endswith("/compat/"):
-                effective_provider = "openai"
-                
-                # Cloudflare Model Prefixing: {provider}/{model}
-                prefix = "openai"
-                if "google" in base_url or "gemini" in base_url or "google" in provider_name:
-                    prefix = "google-ai-studio"
-                elif "anthropic" in base_url or "anthropic" in provider_name:
-                    prefix = "anthropic"
-                elif "mistral" in base_url or "mistral" in provider_name:
-                    prefix = "mistral"
-                
-                if "/" not in model_name:
-                    model_name = f"{prefix}/{model_name}"
-            
-            # For native endpoints, respect the provider name
-            elif "anthropic" in base_url:
-                effective_provider = "anthropic"
-            elif "google" in base_url or "gemini" in base_url:
-                effective_provider = "google_genai"
+        # Normalize Provider Names
+        provider_map = {"openai_chatcompletions": "openai", "openai_responses": "openai", "google": "google_genai", "dmr": "openai"}
+        effective_provider = provider_map.get(effective_provider, effective_provider)
 
-            # Cleanup URL
-            if base_url:
-                base_url = base_url.replace("/chat/completions", "").rstrip("/")
-
-        # 7. Authentication Extraction
+        # Interpolate and Extract Headers/Auth
+        headers = {k: interpolate_env_vars(v) for k, v in resolved_config.get("headers", {}).items()}
         api_key = None
         
-        # Cloudflare Special Case: The 'cf-aig-authorization' header can be used as the api_key
-        # for the OpenAI provider if it contains the Bearer token.
-        if is_gateway and effective_provider == "openai":
-            if "cf-aig-authorization" in interpolated_headers:
-                auth = interpolated_headers["cf-aig-authorization"] # Don't pop yet, keep for other providers
-                if auth.startswith("Bearer "):
-                    api_key = auth[7:]
-                else:
-                    api_key = auth
-
-        # Standard extraction
+        if gw.is_gateway and effective_provider == "openai" and "cf-aig-authorization" in headers:
+            api_key = headers["cf-aig-authorization"].removeprefix("Bearer ")
+        
         if not api_key:
-            if "x-goog-api-key" in interpolated_headers:
-                api_key = interpolated_headers.get("x-goog-api-key")
-            elif "Authorization" in interpolated_headers:
-                auth = interpolated_headers.get("Authorization")
-                if auth.startswith("Bearer "):
-                    api_key = auth[7:]
-                else:
-                    api_key = auth
-
-        # Fallback to environment
+            api_key = headers.get("x-goog-api-key") or headers.get("Authorization", "").removeprefix("Bearer ") or None
+            
         if not api_key:
-            if effective_provider == "openai":
-                api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("CF_AIG_TOKEN")
-            elif effective_provider == "anthropic":
-                api_key = os.environ.get("ANTHROPIC_API_KEY")
-            elif effective_provider == "google_genai":
-                api_key = os.environ.get("GOOGLE_API_KEY")
+            env_map = {"openai": ["OPENAI_API_KEY", "CF_AIG_TOKEN"], "anthropic": ["ANTHROPIC_API_KEY"], "google_genai": ["GOOGLE_API_KEY"]}
+            for env_var in env_map.get(effective_provider, []):
+                if val := os.environ.get(env_var):
+                    api_key = val
+                    break
 
         try:
-            
-            # Prepare final arguments for init_chat_model
             model_args = {
                 "model": model_name,
                 "model_provider": effective_provider,
                 "temperature": resolved_config.get("temperature"),
                 "max_tokens": resolved_config.get("max_tokens"),
+                "base_url": base_url.rstrip("/") if base_url else None
             }
 
             if api_key:
-                if effective_provider == "google_genai":
-                    model_args["google_api_key"] = api_key
-                else:
-                    model_args["api_key"] = api_key
-            
-            if base_url:
-                model_args["base_url"] = base_url
-            
-            # Header handling
+                key_field = "google_api_key" if effective_provider == "google_genai" else "api_key"
+                model_args[key_field] = api_key
+
             if effective_provider == "google_genai":
-                if interpolated_headers:
-                    # Filter out standard keys to avoid duplication
-                    filtered = {k: v for k, v in interpolated_headers.items() if k.lower() not in ["x-goog-api-key", "authorization"]}
-                    if filtered:
-                        model_args["additional_headers"] = filtered
-            elif interpolated_headers:
-                model_args["default_headers"] = interpolated_headers
+                filtered_headers = {k: v for k, v in headers.items() if k.lower() not in ["x-goog-api-key", "authorization"]}
+                if filtered_headers:
+                    model_args["additional_headers"] = filtered_headers
+            elif headers:
+                model_args["default_headers"] = headers
 
             from deepagents.profiles import _get_harness_profile
-            profile_key = "cloudflare" if is_gateway else effective_provider
-            profile = _get_harness_profile(profile_key)
-            
+            profile = _get_harness_profile("cloudflare" if gw.is_gateway else effective_provider)
             init_kwargs = {**profile.init_kwargs}
             if profile.init_kwargs_factory:
                 init_kwargs.update(profile.init_kwargs_factory())
-            
-            if is_gateway:
+            if gw.is_gateway:
                 init_kwargs = {k: v for k, v in init_kwargs.items() if v is not False}
 
-            # provider_opts
             provider_opts = resolved_config.get("provider_opts", {}).copy()
             if effective_provider != "anthropic":
                 provider_opts.pop("service_tier", None)
 
-            model = init_chat_model(
-                **model_args,
-                **init_kwargs,
-                **provider_opts
-            )
-            resolved_models[name] = model
+            resolved_models[name] = init_chat_model(**model_args, **init_kwargs, **provider_opts)
         except Exception as e:
             print(f"Warning: Failed to initialize '{name}': {e}")
             resolved_models[name] = e
