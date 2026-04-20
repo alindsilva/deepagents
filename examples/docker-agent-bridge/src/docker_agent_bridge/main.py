@@ -22,14 +22,15 @@ async def _run_bridge():
         # Handle TUI mode
         if args.tui:
             from deepagents_cli.app import DeepAgentsApp
-            from deepagents.backends import CompositeBackend, StateBackend
+            from deepagents.backends import FilesystemBackend
             import uuid
+            import os
 
             app = DeepAgentsApp(
                 agent=graph,
                 assistant_id=f"bridge-{uuid.uuid4().hex[:8]}",
                 thread_id=str(uuid.uuid4()),
-                backend=CompositeBackend(default=StateBackend(), routes={}),
+                backend=FilesystemBackend(root_dir=os.getcwd()),
                 initial_prompt=args.query
             )
             await app.run_async()

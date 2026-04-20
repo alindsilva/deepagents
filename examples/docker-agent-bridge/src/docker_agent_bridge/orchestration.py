@@ -1,3 +1,4 @@
+import os
 from typing import Any
 from deepagents.graph import create_deep_agent
 from deepagents.middleware.summarization import SummarizationMiddleware
@@ -72,7 +73,17 @@ async def build_agent_graph(config: dict[str, Any]) -> Any:
         num_history = agent_data.get("num_history_items")
         
         # 5. Create the Deep Agent
-        skills_paths = ["./skills/"] if agent_data.get("skills") is True else None
+        # Standard skill locations to search if skills: true
+        skills_paths = None
+        if agent_data.get("skills") is True:
+            skills_paths = []
+            for candidate in ["./skills/", "./.agents/skills/", "./.claude/skills/"]:
+                if os.path.isdir(candidate):
+                    skills_paths.append(candidate)
+            
+            # Fallback to current directory if no standard folders found
+            if not skills_paths:
+                skills_paths = ["./"]
 
         agent = create_deep_agent(
             model=model,
